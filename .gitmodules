@@ -1,4 +1,4 @@
 [submodule "src/plc"]
 	path = src/plc
-	url = https://github.com/nyrahul/plc.git
-    branch = master
+	url = https://github.com/Cascoda/plc.git
+    branch = wf-plc-changes

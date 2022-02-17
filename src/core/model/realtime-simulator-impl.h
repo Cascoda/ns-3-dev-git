@@ -90,6 +90,8 @@ public:
 
   // Inherited from SimulatorImpl
   virtual void Destroy ();
+  /** Have to have it here for ns3 to build. But only used with DefaulSimulatortImpl */
+  virtual bool IsNextEventNow (void) const;
   virtual bool IsFinished (void) const;
   virtual void Stop (void);
   virtual void Stop (const Time &delay);

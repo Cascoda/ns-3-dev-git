@@ -85,6 +85,8 @@ public:
   virtual Time GetDelayLeft (const EventId &id) const = 0;
   /** \copydoc Simulator::GetMaximumSimulationTime */
   virtual Time GetMaximumSimulationTime (void) const = 0;
+  /** Custom */
+  virtual bool IsNextEventNow (void) const = 0;
   /**
    * Set the Scheduler to be used to manage the event list.
    *

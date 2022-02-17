@@ -142,6 +142,12 @@ RealtimeSimulatorImpl::Destroy ()
     }
 }
 
+bool
+RealtimeSimulatorImpl::IsNextEventNow (void) const
+{
+	return false;
+}
+
 void
 RealtimeSimulatorImpl::SetScheduler (ObjectFactory schedulerFactory)
 {

@@ -60,6 +60,8 @@ public:
 
   // Inherited
   virtual void Destroy ();
+  /* Custom */
+  virtual bool IsNextEventNow (void) const ;
   virtual bool IsFinished (void) const;
   virtual void Stop (void);
   virtual void Stop (const Time &delay);

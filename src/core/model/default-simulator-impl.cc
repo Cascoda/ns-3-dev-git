@@ -110,6 +110,20 @@ DefaultSimulatorImpl::Destroy ()
     }
 }
 
+bool
+DefaultSimulatorImpl::IsNextEventNow (void) const
+{
+	if(!IsFinished())
+	{
+		if(m_events->PeekNext().key.m_ts == m_currentTs)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void
 DefaultSimulatorImpl::SetScheduler (ObjectFactory schedulerFactory)
 {

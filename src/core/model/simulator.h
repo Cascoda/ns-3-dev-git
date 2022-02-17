@@ -1276,6 +1276,9 @@ public:
    */
   static Time GetMaximumSimulationTime (void);
 
+  /* Custom */
+  static bool IsNextEventNow (void);
+
   /**
    * Schedule a future event execution (in the same context).
    *

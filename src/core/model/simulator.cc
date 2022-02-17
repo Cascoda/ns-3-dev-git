@@ -374,6 +374,12 @@ Simulator::GetMaximumSimulationTime (void)
   return GetImpl ()->GetMaximumSimulationTime ();
 }
 
+bool
+Simulator::IsNextEventNow (void)
+{
+	return GetImpl ()->IsNextEventNow ();
+}
+
 uint32_t
 Simulator::GetContext (void)
 {

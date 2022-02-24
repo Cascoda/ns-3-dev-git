@@ -276,11 +276,13 @@ LrWpanPhy::SetAntenna (Ptr<AntennaModel> a)
 void
 LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 {
+	fprintf(stderr, "In LrWpanPhy::StartRx()\n");
   NS_LOG_FUNCTION (this << spectrumRxParams);
   LrWpanSpectrumValueHelper psdHelper;
 
   if (!m_edRequest.IsExpired ())
     {
+	  fprintf(stderr, "\tm_edRequest not expired\n");
       // Update the average receive power during ED.
       Time now = Simulator::Now ();
       m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel) * (now - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
@@ -291,6 +293,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 
   if (lrWpanRxParams == 0)
     {
+	  fprintf(stderr, "\tlrWpanRxParams == 0\n");
       CheckInterference ();
       m_signal->AddSignal (spectrumRxParams->psd);
 
@@ -310,6 +313,19 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 
   Ptr<Packet> p = (lrWpanRxParams->packetBurst->GetPackets ()).front ();
   NS_ASSERT (p != 0);
+
+  //DEBUG STUFF
+  uint8_t buf[127];
+	  p->CopyData(buf, p->GetSize());
+
+	fprintf(stderr, "In StartRx, psduLength: %d\n", p->GetSize());
+      fprintf(stderr, "PACKET TO SEND: 0x");
+      for(uint16_t i = 0; i < p->GetSize(); i++)
+      {
+      	fprintf(stderr, "%02x", buf[i]);
+      }
+      fprintf(stderr, "\n");
+      //DEBUF STUFF ^^
 
   // Prevent PHY from receiving another packet while switching the transceiver state.
   if (m_trxState == IEEE_802_15_4_PHY_RX_ON && !m_setTRXState.IsRunning ())
@@ -390,12 +406,15 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
   // Always call EndRx to update the interference.
   // \todo: Do we need to keep track of these events to unschedule them when disposing off the PHY?
 
+fprintf(stderr, "LrWpanPhy::EndRx() scheduled for %ld us in the future (cur sim time: %ld)\n",
+		spectrumRxParams->duration.GetMicroSeconds(), Simulator::Now().GetTimeStep());
   Simulator::Schedule (spectrumRxParams->duration, &LrWpanPhy::EndRx, this, spectrumRxParams);
 }
 
 void
 LrWpanPhy::CheckInterference (void)
 {
+	fprintf(stderr, "In CheckInterference()\n");
   // Calculate whether packet was lost.
   LrWpanSpectrumValueHelper psdHelper;
   Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
@@ -406,8 +425,24 @@ LrWpanPhy::CheckInterference (void)
       // NS_ASSERT (currentRxParams && !m_currentRxPacket.second);
 
       Ptr<Packet> currentPacket = currentRxParams->packetBurst->GetPackets ().front ();
+
+      //DEBUG STUFF...
+      uint8_t buf[127];
+	  currentPacket->CopyData(buf, currentPacket->GetSize());
+
+	fprintf(stderr, "In CheckInterference(), psduLength: %d\n", currentPacket->GetSize());
+      fprintf(stderr, "PACKET TO SEND: 0x");
+      for(uint16_t i = 0; i < currentPacket->GetSize(); i++)
+      {
+      	fprintf(stderr, "%02x", buf[i]);
+      }
+      fprintf(stderr, "\n");
+      //DEBUF STUFF ^^
+
+
       if (m_errorModel != 0)
         {
+    	  fprintf(stderr, "\tThere is an error model.\n");
           // How many bits did we receive since the last calculation?
           double t = (Simulator::Now () - m_rxLastUpdate).ToDouble (Time::MS);
           uint32_t chunkSize = ceil (t * (GetDataOrSymbolRate (true) / 1000));
@@ -425,8 +460,21 @@ LrWpanPhy::CheckInterference (void)
           tag.Set (lqi - (per * lqi));
           currentPacket->ReplacePacketTag (tag);
 
+      //DEBUG STUFF...
+	  currentPacket->CopyData(buf, currentPacket->GetSize());
+
+	fprintf(stderr, "After LQI stuff, psduLength: %d\n", currentPacket->GetSize());
+      fprintf(stderr, "PACKET TO SEND: 0x");
+      for(uint16_t i = 0; i < currentPacket->GetSize(); i++)
+      {
+      	fprintf(stderr, "%02x", buf[i]);
+      }
+      fprintf(stderr, "\n");
+      //DEBUF STUFF ^^
+
           if (m_random->GetValue () < per)
             {
+        	  fprintf(stderr, "Packet was destroyed, drop the packet after reception.\n");
               // The packet was destroyed, drop the packet after reception.
               m_currentRxPacket.second = true;
             }
@@ -442,6 +490,7 @@ LrWpanPhy::CheckInterference (void)
 void
 LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
 {
+	fprintf(stderr, "In LrWpanPhy::EndRx()\n");
   NS_LOG_FUNCTION (this);
 
   Ptr<LrWpanSpectrumSignalParameters> params = DynamicCast<LrWpanSpectrumSignalParameters> (par);
@@ -457,6 +506,7 @@ LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
   Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
   if (currentRxParams == params)
     {
+	  fprintf(stderr, "currentRxParams == params, will check interference...\n");
       CheckInterference ();
     }
 
@@ -472,16 +522,44 @@ LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
   // If this is the end of the currently received packet, check if reception was successful.
   if (currentRxParams == params)
     {
+	  fprintf(stderr, "In EndRx, currentRxParams == params, end of currently received packet. "
+			  "Check if reception was successful...\n");
       Ptr<Packet> currentPacket = currentRxParams->packetBurst->GetPackets ().front ();
       NS_ASSERT (currentPacket != 0);
+
+      //DEBUG STUFF...
+      uint8_t buf[127];
+	  currentPacket->CopyData(buf, currentPacket->GetSize());
+
+	fprintf(stderr, "In EndRx, before LQI, psduLength: %d\n", currentPacket->GetSize());
+      fprintf(stderr, "PACKET TO SEND: 0x");
+      for(uint16_t i = 0; i < currentPacket->GetSize(); i++)
+      {
+      	fprintf(stderr, "%02x", buf[i]);
+      }
+      fprintf(stderr, "\n");
+      //DEBUF STUFF ^^
 
       // If there is no error model attached to the PHY, we always report the maximum LQI value.
       LrWpanLqiTag tag (std::numeric_limits<uint8_t>::max ());
       currentPacket->PeekPacketTag (tag);
       m_phyRxEndTrace (currentPacket, tag.Get ());
 
+      //DEBUG STUFF...
+	  currentPacket->CopyData(buf, currentPacket->GetSize());
+
+	fprintf(stderr, "In EndRx, after LQI, psduLength: %d\n", currentPacket->GetSize());
+      fprintf(stderr, "PACKET TO SEND: 0x");
+      for(uint16_t i = 0; i < currentPacket->GetSize(); i++)
+      {
+      	fprintf(stderr, "%02x", buf[i]);
+      }
+      fprintf(stderr, "\n");
+      //DEBUF STUFF ^^
+
       if (!m_currentRxPacket.second)
         {
+    	  fprintf(stderr, "The packet was successfully received, push it up the stack...\n");
           // The packet was successfully received, push it up the stack.
           if (!m_pdDataIndicationCallback.IsNull ())
             {
@@ -490,6 +568,7 @@ LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
         }
       else
         {
+    	  fprintf(stderr, "The packet was destroyed, drop it\n");
           // The packet was destroyed, drop it.
           m_phyRxDropTrace (currentPacket);
         }
@@ -522,6 +601,19 @@ LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
 void
 LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
 {
+      //DEBUG STUFF...
+      uint8_t buf[127];
+	  p->CopyData(buf, psduLength);
+
+	fprintf(stderr, "In PdDataRequest, psduLength: %d\n", psduLength);
+      fprintf(stderr, "PACKET TO SEND: 0x");
+      for(uint16_t i = 0; i < psduLength; i++)
+      {
+      	fprintf(stderr, "%02x", buf[i]);
+      }
+      fprintf(stderr, "\n");
+      //DEBUF STUFF ^^
+
   NS_LOG_FUNCTION (this << psduLength << p);
 
   if (psduLength > aMaxPhyPacketSize)
@@ -539,12 +631,17 @@ LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
     {
       if (m_trxState == IEEE_802_15_4_PHY_TX_ON)
         {
+    	  fprintf(stderr, "m_trxState is PHY_TX_ON\n");
           //send down
           NS_ASSERT (m_channel);
 
-          // Remove a possible LQI tag from a previous transmission of the packet.
-          LrWpanLqiTag lqiTag;
-          p->RemovePacketTag (lqiTag);
+#if 0 //Skip that part for OpenThread
+        	  // Remove a possible LQI tag from a previous transmission of the packet.
+        	  LrWpanLqiTag lqiTag;
+        	  p->RemovePacketTag (lqiTag);
+#else
+        	  fprintf(stderr, "Skips 'removal of a possible LQI tag'\n");
+#endif
 
           m_phyTxBeginTrace (p);
           m_currentTxPacket.first = p;
@@ -557,9 +654,15 @@ LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
           txParams->txAntenna = m_antenna;
           Ptr<PacketBurst> pb = CreateObject<PacketBurst> ();
           pb->AddPacket (p);
+
           txParams->packetBurst = pb;
           m_channel->StartTx (txParams);
+          fprintf(stderr, "StartTx called\n");
           m_pdDataRequest = Simulator::Schedule (txParams->duration, &LrWpanPhy::EndTx, this);
+
+          fprintf(stderr, "LrWpanPhy::EndTx scheduled for %ld us in the future (current sim: %ld)\n",
+        		  txParams->duration.GetTimeStep(), Simulator::Now().GetTimeStep());
+
           ChangeTrxState (IEEE_802_15_4_PHY_BUSY_TX);
           return;
         }
@@ -597,12 +700,14 @@ LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
 void
 LrWpanPhy::PlmeCcaRequest (void)
 {
+	fprintf(stderr, "In PlmeCcaRequest(), m_trxState: %d\n", m_trxState.Get());
   NS_LOG_FUNCTION (this);
 
   if (m_trxState == IEEE_802_15_4_PHY_RX_ON || m_trxState == IEEE_802_15_4_PHY_BUSY_RX)
     {
       m_ccaPeakPower = 0.0;
       Time ccaTime = Seconds (8.0 / GetDataOrSymbolRate (false));
+      fprintf(stderr, "CCA to end in %ld us (curr sim time: %ld)\n", ccaTime.GetTimeStep(), Simulator::Now().GetTimeStep());
       m_ccaRequest = Simulator::Schedule (ccaTime, &LrWpanPhy::EndCca, this);
     }
   else
@@ -686,6 +791,7 @@ LrWpanPhy::PlmeGetAttributeRequest (LrWpanPibAttributeIdentifier id)
 void
 LrWpanPhy::PlmeSetTRXStateRequest (LrWpanPhyEnumeration state)
 {
+  fprintf(stderr, "In PlmeSetTRXStateRequest, state: %d, m_trxState: %d\n", state, m_trxState.Get());
   NS_LOG_FUNCTION (this << state);
 
   // Check valid states (Table 14)
@@ -1045,6 +1151,8 @@ LrWpanPhy::SetPlmeSetAttributeConfirmCallback (PlmeSetAttributeConfirmCallback c
 void
 LrWpanPhy::ChangeTrxState (LrWpanPhyEnumeration newState)
 {
+	fprintf(stderr, "ChangeTrxState: %d to %d\n", m_trxState.Get(), newState);
+
   NS_LOG_LOGIC (this << " state: " << m_trxState << " -> " << newState);
   m_trxStateLogger (Simulator::Now (), m_trxState, newState);
   m_trxState = newState;
@@ -1110,11 +1218,13 @@ LrWpanPhy::EndEd (void)
 void
 LrWpanPhy::EndCca (void)
 {
+	fprintf(stderr, "In EndCca, sim time: %ld\n", Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this);
   LrWpanPhyEnumeration sensedChannelState = IEEE_802_15_4_PHY_UNSPECIFIED;
 
   // Update peak power.
   double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel);
+  fprintf(stderr, "power: %lf, m_ccaPeakPower: %lf\n", power, m_ccaPeakPower);
   if (m_ccaPeakPower < power)
     {
       m_ccaPeakPower = power;
@@ -1123,16 +1233,19 @@ LrWpanPhy::EndCca (void)
   if (PhyIsBusy ())
     {
       sensedChannelState = IEEE_802_15_4_PHY_BUSY;
+      fprintf(stderr, "PHYISBUSY()\n");
     }
   else if (m_phyPIBAttributes.phyCCAMode == 1)
     { //sec 6.9.9 ED detection
       // -- ED threshold at most 10 dB above receiver sensitivity.
       if (10 * log10 (m_ccaPeakPower / m_rxSensitivity) >= 10.0)
         {
+    	  fprintf(stderr, "set sensedChannelState to BUSY\n");
           sensedChannelState = IEEE_802_15_4_PHY_BUSY;
         }
       else
         {
+    	  fprintf(stderr, "set sensedChannelState to IDLE\n");
           sensedChannelState = IEEE_802_15_4_PHY_IDLE;
         }
     }
@@ -1199,12 +1312,15 @@ LrWpanPhy::EndSetTRXState (void)
 void
 LrWpanPhy::EndTx (void)
 {
+	fprintf(stderr, "In LrWpanPhy::EndTx()\n");
+
   NS_LOG_FUNCTION (this);
 
   NS_ABORT_IF ( (m_trxState != IEEE_802_15_4_PHY_BUSY_TX) && (m_trxState != IEEE_802_15_4_PHY_TRX_OFF));
 
   if (m_currentTxPacket.second == false)
     {
+	  fprintf(stderr, "Packet successfully transmitted\n");
       NS_LOG_DEBUG ("Packet successfully transmitted");
       m_phyTxEndTrace (m_currentTxPacket.first);
       if (!m_pdDataConfirmCallback.IsNull ())
@@ -1214,6 +1330,7 @@ LrWpanPhy::EndTx (void)
     }
   else
     {
+	  fprintf(stderr, "Packet transmission aborted\n");
       NS_LOG_DEBUG ("Packet transmission aborted");
       m_phyTxDropTrace (m_currentTxPacket.first);
       if (!m_pdDataConfirmCallback.IsNull ())
@@ -1230,6 +1347,7 @@ LrWpanPhy::EndTx (void)
   // We may be waiting to apply a pending state change.
   if (m_trxStatePending != IEEE_802_15_4_PHY_IDLE)
     {
+	  fprintf(stderr, "HERE....\n");
       // Only change the state immediately, if the transceiver is not already
       // switching the state.
       if (!m_setTRXState.IsRunning ())
@@ -1245,6 +1363,7 @@ LrWpanPhy::EndTx (void)
     }
   else
     {
+	  fprintf(stderr, "NOT HERE...\n");
       if (m_trxState != IEEE_802_15_4_PHY_TRX_OFF)
         {
           ChangeTrxState (IEEE_802_15_4_PHY_TX_ON);

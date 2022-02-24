@@ -187,6 +187,7 @@ LrWpanCsmaCa::Start ()
   m_NB = 0;
   if (IsSlottedCsmaCa ())
     {
+	  fprintf(stderr, "IsSlottedCsmaCa()\n");
       m_CW = 2;
       if (m_BLE)
         {
@@ -202,8 +203,19 @@ LrWpanCsmaCa::Start ()
     }
   else
     {
-      m_BE = m_macMinBE;
-      m_randomBackoffEvent = Simulator::ScheduleNow (&LrWpanCsmaCa::RandomBackoffDelay, this);
+	  fprintf(stderr, "IsNotSlottedCsmaCa()\n");
+	  if(!this->GetMac()->m_macHeaderAdd)
+	  {
+		  fprintf(stderr, "Immediately do a CCA\n");
+		  //Let OpenThread do CSMA/CA, so skip RandomBackoffDelay call, and instead directly request a CCA.
+		  m_requestCcaEvent = Simulator::ScheduleNow (&LrWpanCsmaCa::RequestCCA, this);
+	  }
+	  else
+	  {
+		  fprintf(stderr, "Normal CSMA/CA\n");
+		  m_BE = m_macMinBE;
+		  m_randomBackoffEvent = Simulator::ScheduleNow (&LrWpanCsmaCa::RandomBackoffDelay, this);
+	  }
     }
   /*
   *  TODO: If using Backoff.cc (will need to modify Backoff::GetBackoffTime)
@@ -230,6 +242,7 @@ LrWpanCsmaCa::Cancel ()
 void
 LrWpanCsmaCa::RandomBackoffDelay ()
 {
+	fprintf(stderr, "In RandomBackoffDelay()\n");
   NS_LOG_FUNCTION (this);
 
   uint64_t upperBound = (uint64_t) pow (2, m_BE) - 1;
@@ -278,15 +291,14 @@ LrWpanCsmaCa::CanProceed ()
       m_requestCcaEvent = Simulator::Schedule (backoffBoundary, &LrWpanCsmaCa::RequestCCA, this);
     }
   else
-    {
-      Time nextCap = Seconds (0);
-      m_randomBackoffEvent = Simulator::Schedule (nextCap, &LrWpanCsmaCa::RandomBackoffDelay, this);
+    { Time nextCap = Seconds (0); m_randomBackoffEvent = Simulator::Schedule (nextCap, &LrWpanCsmaCa::RandomBackoffDelay, this);
     }
 }
 
 void
 LrWpanCsmaCa::RequestCCA ()
 {
+	fprintf(stderr, "In RequestCCA()\n");
   NS_LOG_FUNCTION (this);
   m_ccaRequestRunning = true;
   m_mac->GetPhy ()->PlmeCcaRequest ();
@@ -298,6 +310,7 @@ LrWpanCsmaCa::RequestCCA ()
 void
 LrWpanCsmaCa::PlmeCcaConfirm (LrWpanPhyEnumeration status)
 {
+	fprintf(stderr, "In PlmeCcaConfirm(), status: %d\n", status);
   NS_LOG_FUNCTION (this << status);
 
   // Only react on this event, if we are actually waiting for a CCA.

@@ -256,7 +256,9 @@ LrWpanMac::GetExtendedAddress () const
 void
 LrWpanMac::McpsDataRequest (McpsDataRequestParams params, Ptr<Packet> p)
 {
+
   NS_LOG_FUNCTION (this << p);
+  fprintf(stderr, "In McpsDataRequest! sim time: %ld\n", Simulator::Now().GetTimeStep());
 
   // TODO: We need a drop trace for the case that the packet is too large or the request parameters are maleformed.
   //       The current tx drop trace is not suitable, because packets dropped using this trace carry the mac header
@@ -415,6 +417,15 @@ LrWpanMac::McpsDataRequest (McpsDataRequestParams params, Ptr<Packet> p)
   TxQueueElement *txQElement = new TxQueueElement;
   txQElement->txQMsduHandle = params.m_msduHandle;
   txQElement->txQPkt = p;
+
+  if(!m_txQueue.empty())
+  {
+	  fprintf(stderr, "QUEUE NOT EMPTY!!\n");
+  }
+  else
+  {
+	  fprintf(stderr, "QUEUE EMPTY!!\n");
+  }
   m_txQueue.push_back (txQElement);
 
   CheckQueue ();
@@ -467,6 +478,7 @@ LrWpanMac::SetMcpsDataConfirmCallback (McpsDataConfirmCallback c)
 void
 LrWpanMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi)
 {
+	fprintf(stderr, "In PdDataIndication\n");
   NS_ASSERT (m_lrWpanMacState == MAC_IDLE || m_lrWpanMacState == MAC_ACK_PENDING || m_lrWpanMacState == MAC_CSMA);
 
   NS_LOG_FUNCTION (this << psduLength << p << (uint16_t)lqi);
@@ -491,64 +503,83 @@ LrWpanMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi)
   // XXX no rejection tracing (to macRxDropTrace) being performed below
 
   LrWpanMacTrailer receivedMacTrailer;
-  p->RemoveTrailer (receivedMacTrailer);
-  if (Node::ChecksumEnabled ())
+  McpsDataIndicationParams params;
+  LrWpanMacHeader receivedMacHdr;
+
+  if(m_macHeaderAdd)
+  {
+	  p->RemoveTrailer (receivedMacTrailer);
+  }
+
+  if (m_macHeaderAdd && Node::ChecksumEnabled ())
     {
       receivedMacTrailer.EnableFcs (true);
     }
 
   // level 1 filtering
-  if (!receivedMacTrailer.CheckFcs (p))
+  if (m_macHeaderAdd && !receivedMacTrailer.CheckFcs (p))
     {
       NS_LOG_DEBUG(this << "Dropping since FCS check failed\n");
       m_macRxDropTrace (originalPkt);
     }
   else
     {
-      LrWpanMacHeader receivedMacHdr;
-      p->RemoveHeader (receivedMacHdr);
+      if(m_macHeaderAdd)
+      {
+		  p->RemoveHeader (receivedMacHdr);
 
-      McpsDataIndicationParams params;
-      params.m_dsn = receivedMacHdr.GetSeqNum ();
-      params.m_mpduLinkQuality = lqi;
-      params.m_srcPanId = receivedMacHdr.GetSrcPanId ();
-      params.m_srcAddrMode = receivedMacHdr.GetSrcAddrMode ();
-      switch (params.m_srcAddrMode)
-        {
-        case SHORT_ADDR:
-          params.m_srcAddr = receivedMacHdr.GetShortSrcAddr ();
-          NS_LOG_DEBUG ("Packet from " << params.m_srcAddr);
-          break;
-        case EXT_ADDR:
-          params.m_srcExtAddr = receivedMacHdr.GetExtSrcAddr ();
-          NS_LOG_DEBUG ("Packet from " << params.m_srcExtAddr);
-          break;
-        default:
-          break;
-        }
-      params.m_dstPanId = receivedMacHdr.GetDstPanId ();
-      params.m_dstAddrMode = receivedMacHdr.GetDstAddrMode ();
-      switch (params.m_dstAddrMode)
-        {
-        case SHORT_ADDR:
-          params.m_dstAddr = receivedMacHdr.GetShortDstAddr ();
-          NS_LOG_DEBUG ("Packet to " << params.m_dstAddr);
-          break;
-        case EXT_ADDR:
-          params.m_dstExtAddr = receivedMacHdr.GetExtDstAddr ();
-          NS_LOG_DEBUG ("Packet to " << params.m_dstExtAddr);
-          break;
-        default:
-          break;
-        }
+		  params.m_dsn = receivedMacHdr.GetSeqNum ();
+		  params.m_mpduLinkQuality = lqi;
+		  params.m_srcPanId = receivedMacHdr.GetSrcPanId ();
+		  params.m_srcAddrMode = receivedMacHdr.GetSrcAddrMode ();
+
+		  switch (params.m_srcAddrMode)
+			{
+			case SHORT_ADDR:
+			  params.m_srcAddr = receivedMacHdr.GetShortSrcAddr ();
+			  NS_LOG_DEBUG ("Packet from " << params.m_srcAddr);
+			  break;
+			case EXT_ADDR:
+			  params.m_srcExtAddr = receivedMacHdr.GetExtSrcAddr ();
+			  NS_LOG_DEBUG ("Packet from " << params.m_srcExtAddr);
+			  break;
+			default:
+			  break;
+			}
+		  params.m_dstPanId = receivedMacHdr.GetDstPanId ();
+		  params.m_dstAddrMode = receivedMacHdr.GetDstAddrMode ();
+
+		  switch (params.m_dstAddrMode)
+			{
+			case SHORT_ADDR:
+			  params.m_dstAddr = receivedMacHdr.GetShortDstAddr ();
+			  NS_LOG_DEBUG ("Packet to " << params.m_dstAddr);
+			  break;
+			case EXT_ADDR:
+			  params.m_dstExtAddr = receivedMacHdr.GetExtDstAddr ();
+			  NS_LOG_DEBUG ("Packet to " << params.m_dstExtAddr);
+			  break;
+			default:
+			  break;
+			}
+      }
 
       if (m_macPromiscuousMode)
         {
           //level 2 filtering
           if (!m_mcpsDataIndicationCallback.IsNull ())
             {
+        	  fprintf(stderr, "promiscuous mode, forwarding up\n");
               NS_LOG_DEBUG ("promiscuous mode, forwarding up");
-              m_mcpsDataIndicationCallback (params, p);
+
+              if(m_macHeaderAdd)
+              {
+            	  m_mcpsDataIndicationCallback (params, p);
+              }
+              else
+              {
+            	  m_mcpsDataIndicationCallback (params, originalPkt);
+              }
             }
           else
             {
@@ -557,6 +588,7 @@ LrWpanMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi)
         }
       else
         {
+    	  fprintf(stderr, "Not promiscuous mode...\n");
 #define ACCEPTfRAME (acceptFrame && m_macHeaderAdd)
           //level 3 frame filtering
           acceptFrame = (receivedMacHdr.GetType () != LrWpanMacHeader::LRWPAN_MAC_RESERVED);
@@ -736,12 +768,16 @@ LrWpanMac::RemoveFirstTxQElement ()
   m_numCsmacaRetry += m_csmaCa->GetNB () + 1;
 
   Ptr<Packet> pkt = p->Copy ();
-  LrWpanMacHeader hdr;
-  pkt->RemoveHeader (hdr);
-  if (hdr.GetShortDstAddr () != Mac16Address ("ff:ff"))
-    {
-      m_sentPktTrace (p, m_retransmission + 1, m_numCsmacaRetry);
-    }
+
+  if(m_macHeaderAdd)
+  {
+	  LrWpanMacHeader hdr;
+	  pkt->RemoveHeader (hdr);
+	  if (hdr.GetShortDstAddr () != Mac16Address ("ff:ff"))
+		{
+		  m_sentPktTrace (p, m_retransmission + 1, m_numCsmacaRetry);
+		}
+  }
 
   txQElement->txQPkt = 0;
   delete txQElement;
@@ -797,6 +833,8 @@ LrWpanMac::PrepareRetransmission (void)
 void LrWpanMac::CallDataConfirmCallback(LrWpanMcpsDataConfirmStatus status,
         LrWpanMacHeader macHdr, uint32_t pktSize)
 {
+	fprintf(stderr, "In CallDataConfirmCallback()\n");
+
   McpsDataConfirmParams confirmParams;
 
   if (m_mcpsDataConfirmCallback.IsNull ()) {
@@ -829,21 +867,29 @@ void LrWpanMac::CallDataConfirmCallback(LrWpanMcpsDataConfirmStatus status)
     {
       return;
     }
-  m_txPkt->PeekHeader (macHdr);
+  if(m_macHeaderAdd)
+  {
+	  m_txPkt->PeekHeader (macHdr);
+  }
   CallDataConfirmCallback(status, macHdr, m_txPkt->GetSize());
 }
 
 void
 LrWpanMac::PdDataConfirm (LrWpanPhyEnumeration status)
 {
+	fprintf(stderr, "In PdDataConfirm(), status %d\n", status);
   NS_ASSERT (m_lrWpanMacState == MAC_SENDING);
 
   NS_LOG_FUNCTION (this << status << m_txQueue.size ());
 
+#if 0 //Skip that part if using Whitefield with Openthread!
   LrWpanMacHeader macHdr;
   m_txPkt->PeekHeader (macHdr);
+#endif
+
   if (status == IEEE_802_15_4_PHY_SUCCESS)
     {
+#if 0
       if (!macHdr.IsAcknowledgment ())
         {
           // We have just send a regular data packet, check if we have to wait
@@ -861,10 +907,12 @@ LrWpanMac::PdDataConfirm (LrWpanPhyEnumeration status)
             }
           else
             {
+#endif //OpenThread: Assuming not an Ack, and assuming that no Ack Requested (Because OT takes care of that stuff)
               m_macTxOkTrace (m_txPkt);
               // remove the copy of the packet that was just sent
               CallDataConfirmCallback(IEEE_802_15_4_SUCCESS);
               RemoveFirstTxQElement ();
+#if 0
             }
         }
       else
@@ -872,22 +920,26 @@ LrWpanMac::PdDataConfirm (LrWpanPhyEnumeration status)
           // We have send an ACK. Clear the packet buffer.
           m_txPkt = 0;
         }
+#endif
     }
   else if (status == IEEE_802_15_4_PHY_UNSPECIFIED)
     {
-
+#if 0
       if (!macHdr.IsAcknowledgment ())
         {
+#endif
           NS_ASSERT_MSG (m_txQueue.size () > 0, "TxQsize = 0");
           TxQueueElement *txQElement = m_txQueue.front ();
           m_macTxDropTrace (txQElement->txQPkt);
           CallDataConfirmCallback(IEEE_802_15_4_FRAME_TOO_LONG);
           RemoveFirstTxQElement ();
+#if 0
         }
       else
         {
           NS_LOG_ERROR ("Unable to send ACK");
         }
+#endif
     }
   else
     {
@@ -926,34 +978,42 @@ LrWpanMac::PlmeGetAttributeConfirm (LrWpanPhyEnumeration status,
 void
 LrWpanMac::PlmeSetTRXStateConfirm (LrWpanPhyEnumeration status)
 {
+	fprintf(stderr, "In PlmeSetTRXStateConfirm, status: %d\n", status);
   NS_LOG_FUNCTION (this << status);
 
   if (m_lrWpanMacState == MAC_SENDING && (status == IEEE_802_15_4_PHY_TX_ON || status == IEEE_802_15_4_PHY_SUCCESS))
     {
+	 fprintf(stderr, "Start sending\n");
       NS_ASSERT (m_txPkt);
 
       // Start sending if we are in state SENDING and the PHY transmitter was enabled.
       m_promiscSnifferTrace (m_txPkt);
       m_snifferTrace (m_txPkt);
       m_macTxTrace (m_txPkt);
+
       m_phy->PdDataRequest (m_txPkt->GetSize (), m_txPkt);
+
     }
   else if (m_lrWpanMacState == MAC_CSMA && (status == IEEE_802_15_4_PHY_RX_ON || status == IEEE_802_15_4_PHY_SUCCESS))
     {
+	  fprintf(stderr, "Start the CSMA algorithm\n");
       // Start the CSMA algorithm as soon as the receiver is enabled.
       m_csmaCa->Start ();
     }
   else if (m_lrWpanMacState == MAC_IDLE)
     {
+	  fprintf(stderr, "Do nothing special\n");
       NS_ASSERT (status == IEEE_802_15_4_PHY_RX_ON || status == IEEE_802_15_4_PHY_SUCCESS || status == IEEE_802_15_4_PHY_TRX_OFF);
       // Do nothing special when going idle.
     }
   else if (m_lrWpanMacState == MAC_ACK_PENDING)
     {
+	  fprintf(stderr, "ACK pending\n");
       NS_ASSERT (status == IEEE_802_15_4_PHY_RX_ON || status == IEEE_802_15_4_PHY_SUCCESS);
     }
   else
     {
+	  fprintf(stderr, "ERROR changing transceiver state\n");
       // TODO: What to do when we receive an error?
       // If we want to transmit a packet, but switching the transceiver on results
       // in an error, we have to recover somehow (and start sending again).
@@ -974,6 +1034,8 @@ LrWpanMac::SetLrWpanMacState (LrWpanMacState macState)
   NS_LOG_FUNCTION (this << "mac state = " << macState);
 
   McpsDataConfirmParams confirmParams;
+
+  fprintf(stderr, "In SetLrWpanMacState, macState: %d\n", macState);
 
   if (macState == MAC_IDLE)
     {
@@ -997,6 +1059,8 @@ LrWpanMac::SetLrWpanMacState (LrWpanMacState macState)
     }
   else if (macState == MAC_CSMA)
     {
+	  fprintf(stderr, "MAC STATE CSMA\n");
+
       NS_ASSERT (m_lrWpanMacState == MAC_IDLE || m_lrWpanMacState == MAC_ACK_PENDING);
 
       ChangeMacState (MAC_CSMA);
@@ -1004,6 +1068,7 @@ LrWpanMac::SetLrWpanMacState (LrWpanMacState macState)
     }
   else if (m_lrWpanMacState == MAC_CSMA && macState == CHANNEL_IDLE)
     {
+	  fprintf(stderr, "MAC STATE CHANNEL_DLE\n");
       // Channel is idle, set transmitter to TX_ON
       ChangeMacState (MAC_SENDING);
       m_phy->PlmeSetTRXStateRequest (IEEE_802_15_4_PHY_TX_ON);

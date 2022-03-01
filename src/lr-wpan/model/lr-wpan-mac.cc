@@ -478,7 +478,7 @@ LrWpanMac::SetMcpsDataConfirmCallback (McpsDataConfirmCallback c)
 void
 LrWpanMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi)
 {
-	fprintf(stderr, "In PdDataIndication\n");
+	fprintf(stderr, "In PdDataIndication, lqi: %d\n", lqi);
   NS_ASSERT (m_lrWpanMacState == MAC_IDLE || m_lrWpanMacState == MAC_ACK_PENDING || m_lrWpanMacState == MAC_CSMA);
 
   NS_LOG_FUNCTION (this << psduLength << p << (uint16_t)lqi);
@@ -524,12 +524,13 @@ LrWpanMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi)
     }
   else
     {
+	  params.m_mpduLinkQuality = lqi;
+
       if(m_macHeaderAdd)
       {
 		  p->RemoveHeader (receivedMacHdr);
 
 		  params.m_dsn = receivedMacHdr.GetSeqNum ();
-		  params.m_mpduLinkQuality = lqi;
 		  params.m_srcPanId = receivedMacHdr.GetSrcPanId ();
 		  params.m_srcAddrMode = receivedMacHdr.GetSrcAddrMode ();
 

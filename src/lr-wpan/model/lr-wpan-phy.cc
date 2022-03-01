@@ -458,6 +458,7 @@ LrWpanPhy::CheckInterference (void)
           currentPacket->PeekPacketTag (tag);
           uint8_t lqi = tag.Get ();
           tag.Set (lqi - (per * lqi));
+          fprintf(stderr, "per: %lf, lqi: %d\n", per, lqi);
           currentPacket->ReplacePacketTag (tag);
 
       //DEBUG STUFF...
@@ -542,7 +543,15 @@ LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
 
       // If there is no error model attached to the PHY, we always report the maximum LQI value.
       LrWpanLqiTag tag (std::numeric_limits<uint8_t>::max ());
-      currentPacket->PeekPacketTag (tag);
+      bool ret = currentPacket->PeekPacketTag (tag);
+      if(ret)
+      {
+    	  fprintf(stderr, "LQI tag found: %d\n", tag.Get());
+      }
+      else
+      {
+    	  fprintf(stderr, "LQI tag not found\n");
+      }
       m_phyRxEndTrace (currentPacket, tag.Get ());
 
       //DEBUG STUFF...
@@ -635,13 +644,9 @@ LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
           //send down
           NS_ASSERT (m_channel);
 
-#if 0 //Skip that part for OpenThread
-        	  // Remove a possible LQI tag from a previous transmission of the packet.
-        	  LrWpanLqiTag lqiTag;
-        	  p->RemovePacketTag (lqiTag);
-#else
-        	  fprintf(stderr, "Skips 'removal of a possible LQI tag'\n");
-#endif
+		  // Remove a possible LQI tag from a previous transmission of the packet.
+		  LrWpanLqiTag lqiTag;
+		  p->RemovePacketTag (lqiTag);
 
           m_phyTxBeginTrace (p);
           m_currentTxPacket.first = p;

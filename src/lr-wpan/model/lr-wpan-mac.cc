@@ -428,12 +428,13 @@ LrWpanMac::McpsDataRequest (McpsDataRequestParams params, Ptr<Packet> p)
   }
   m_txQueue.push_back (txQElement);
 
-  CheckQueue ();
+  CheckQueue (params.m_txOptions);
 }
 
 void
-LrWpanMac::CheckQueue ()
+LrWpanMac::CheckQueue (bool isAck)
 {
+	fprintf(stderr, "In CheckQueue, isAck: %d\n", isAck);
   NS_LOG_FUNCTION (this);
 
   // Pull a packet from the queue and start sending, if we are not already sending.
@@ -441,7 +442,17 @@ LrWpanMac::CheckQueue ()
     {
       TxQueueElement *txQElement = m_txQueue.front ();
       m_txPkt = txQElement->txQPkt;
-      m_setMacState = Simulator::ScheduleNow (&LrWpanMac::SetLrWpanMacState, this, MAC_CSMA);
+
+      if(isAck)
+      {
+		  // Switch transceiver to TX mode. Proceed sending the Ack on confirm.
+		  ChangeMacState (MAC_SENDING);
+		  m_phy->PlmeSetTRXStateRequest (IEEE_802_15_4_PHY_TX_ON);
+      }
+      else
+      {
+    	  m_setMacState = Simulator::ScheduleNow (&LrWpanMac::SetLrWpanMacState, this, MAC_CSMA);
+      }
     }
 }
 
@@ -1051,7 +1062,7 @@ LrWpanMac::SetLrWpanMacState (LrWpanMacState macState)
           m_phy->PlmeSetTRXStateRequest (IEEE_802_15_4_PHY_TRX_OFF);
         }
 
-      CheckQueue ();
+      CheckQueue (false);
     }
   else if (macState == MAC_ACK_PENDING)
     {

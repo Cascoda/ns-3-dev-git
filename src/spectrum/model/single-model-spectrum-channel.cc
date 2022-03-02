@@ -167,6 +167,7 @@ SingleModelSpectrumChannel::StartTx (Ptr<SpectrumSignalParameters> txParams)
               if (m_propagationLoss)
                 {
                   double propagationGainDb = m_propagationLoss->CalcRxPower (0, senderMobility, receiverMobility);
+				  fprintf(stderr, "propagationGainDb %lf db\n", propagationGainDb);
                   NS_LOG_LOGIC ("propagationGainDb = " << propagationGainDb << " dB");
                   pathLossDb -= propagationGainDb;
                 }                    

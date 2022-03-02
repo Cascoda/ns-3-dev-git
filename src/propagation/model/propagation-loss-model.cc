@@ -74,6 +74,7 @@ PropagationLossModel::CalcRxPower (double txPowerDbm,
                                    Ptr<MobilityModel> a,
                                    Ptr<MobilityModel> b) const
 {
+	fprintf(stderr, "CalcRxPower\n");
   double self = DoCalcRxPower (txPowerDbm, a, b);
   if (m_next != 0)
     {

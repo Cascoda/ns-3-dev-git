@@ -631,7 +631,7 @@ private:
    * queue and the MAC is idle, pick the first one and initiate a packet
    * transmission.
    */
-  void CheckQueue (void);
+  void CheckQueue (bool isAck);
 
   /**
    * The trace source fired when packets are considered as successfully sent

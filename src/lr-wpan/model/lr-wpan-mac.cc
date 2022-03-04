@@ -990,7 +990,7 @@ LrWpanMac::PlmeGetAttributeConfirm (LrWpanPhyEnumeration status,
 void
 LrWpanMac::PlmeSetTRXStateConfirm (LrWpanPhyEnumeration status)
 {
-	fprintf(stderr, "In PlmeSetTRXStateConfirm, status: %d\n", status);
+	fprintf(stderr, "In PlmeSetTRXStateConfirm, status: %d, sim time: %ld\n", status, Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this << status);
 
   if (m_lrWpanMacState == MAC_SENDING && (status == IEEE_802_15_4_PHY_TX_ON || status == IEEE_802_15_4_PHY_SUCCESS))
@@ -1008,7 +1008,7 @@ LrWpanMac::PlmeSetTRXStateConfirm (LrWpanPhyEnumeration status)
     }
   else if (m_lrWpanMacState == MAC_CSMA && (status == IEEE_802_15_4_PHY_RX_ON || status == IEEE_802_15_4_PHY_SUCCESS))
     {
-	  fprintf(stderr, "Start the CSMA algorithm\n");
+	  fprintf(stderr, "Start the CSMA algorithm, sim time: %ld\n", Simulator::Now().GetTimeStep());
       // Start the CSMA algorithm as soon as the receiver is enabled.
       m_csmaCa->Start ();
     }
@@ -1047,7 +1047,7 @@ LrWpanMac::SetLrWpanMacState (LrWpanMacState macState)
 
   McpsDataConfirmParams confirmParams;
 
-  fprintf(stderr, "In SetLrWpanMacState, macState: %d\n", macState);
+  fprintf(stderr, "In SetLrWpanMacState, macState: %d, sim time: %ld\n", macState, Simulator::Now().GetTimeStep());
 
   if (macState == MAC_IDLE)
     {

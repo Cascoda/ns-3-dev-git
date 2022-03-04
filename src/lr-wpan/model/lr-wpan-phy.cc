@@ -124,6 +124,7 @@ LrWpanPhy::LrWpanPhy (void)
   : m_edRequest (),
     m_setTRXState ()
 {
+	fprintf(stderr, "In LrWpanPhy() constructor, sim time: %ld\n", Simulator::Now().GetTimeStep());
   m_trxState = IEEE_802_15_4_PHY_TRX_OFF;
   m_trxStatePending = IEEE_802_15_4_PHY_IDLE;
 
@@ -144,7 +145,8 @@ LrWpanPhy::LrWpanPhy (void)
   m_edPower.measurementLength = Seconds (0.0);
 
   // default -110 dBm in W for 2.4 GHz
-  m_rxSensitivity = pow (10.0, -106.58 / 10.0) / 1000.0;
+//  m_rxSensitivity = pow (10.0, -106.58 / 10.0) / 1000.0;
+  m_rxSensitivity = 0; //Will be set by Whitefield, to configured value.
   LrWpanSpectrumValueHelper psdHelper;
   m_txPsd = psdHelper.CreateTxPowerSpectralDensity (m_phyPIBAttributes.phyTransmitPower,
                                                     m_phyPIBAttributes.phyCurrentChannel);
@@ -271,6 +273,13 @@ LrWpanPhy::SetAntenna (Ptr<AntennaModel> a)
 {
   NS_LOG_FUNCTION (this << a);
   m_antenna = a;
+}
+
+void
+LrWpanPhy::SetRxSensitivity(double rxSensitivityDbm)
+{
+  m_rxSensitivity = pow (10.0, rxSensitivityDbm / 10.0) / 1000.0;
+	fprintf(stderr, "In SetRxSensitivity, m_rxSensitivity dbm: %lf, watts: %e\n", rxSensitivityDbm, m_rxSensitivity);
 }
 
 void
@@ -705,7 +714,7 @@ LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
 void
 LrWpanPhy::PlmeCcaRequest (void)
 {
-	fprintf(stderr, "In PlmeCcaRequest(), m_trxState: %d\n", m_trxState.Get());
+	fprintf(stderr, "In PlmeCcaRequest(), m_trxState: %d, sim time: %ld\n", m_trxState.Get(), Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this);
 
   if (m_trxState == IEEE_802_15_4_PHY_RX_ON || m_trxState == IEEE_802_15_4_PHY_BUSY_RX)
@@ -796,7 +805,7 @@ LrWpanPhy::PlmeGetAttributeRequest (LrWpanPibAttributeIdentifier id)
 void
 LrWpanPhy::PlmeSetTRXStateRequest (LrWpanPhyEnumeration state)
 {
-  fprintf(stderr, "In PlmeSetTRXStateRequest, state: %d, m_trxState: %d\n", state, m_trxState.Get());
+  fprintf(stderr, "In PlmeSetTRXStateRequest, state: %d, m_trxState: %d, sim time: %ld\n", state, m_trxState.Get(), Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this << state);
 
   // Check valid states (Table 14)
@@ -1156,7 +1165,7 @@ LrWpanPhy::SetPlmeSetAttributeConfirmCallback (PlmeSetAttributeConfirmCallback c
 void
 LrWpanPhy::ChangeTrxState (LrWpanPhyEnumeration newState)
 {
-	fprintf(stderr, "ChangeTrxState: %d to %d\n", m_trxState.Get(), newState);
+	fprintf(stderr, "ChangeTrxState: %d to %d, sim time: %ld\n", m_trxState.Get(), newState, Simulator::Now().GetTimeStep());
 
   NS_LOG_LOGIC (this << " state: " << m_trxState << " -> " << newState);
   m_trxStateLogger (Simulator::Now (), m_trxState, newState);
@@ -1191,6 +1200,7 @@ LrWpanPhy::CancelEd (LrWpanPhyEnumeration state)
 void
 LrWpanPhy::EndEd (void)
 {
+	fprintf(stderr, "In EndEd(), sim time: %ld", Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this);
 
   m_edPower.averagePower += LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel) * (Simulator::Now () - m_edPower.lastUpdate).GetTimeStep () / m_edPower.measurementLength.GetTimeStep ();
@@ -1243,6 +1253,7 @@ LrWpanPhy::EndCca (void)
   else if (m_phyPIBAttributes.phyCCAMode == 1)
     { //sec 6.9.9 ED detection
       // -- ED threshold at most 10 dB above receiver sensitivity.
+	  fprintf(stderr, "Doing CCA, m_ccaPeakPower: %e, m_rxSensitivity: %e\n", m_ccaPeakPower, m_rxSensitivity);
       if (10 * log10 (m_ccaPeakPower / m_rxSensitivity) >= 10.0)
         {
     	  fprintf(stderr, "set sensedChannelState to BUSY\n");
@@ -1302,6 +1313,7 @@ LrWpanPhy::EndCca (void)
 void
 LrWpanPhy::EndSetTRXState (void)
 {
+	fprintf(stderr, "In EndSetTRXState, sim time: %ld\n", Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this);
 
   NS_ABORT_IF ( (m_trxStatePending != IEEE_802_15_4_PHY_RX_ON) && (m_trxStatePending != IEEE_802_15_4_PHY_TX_ON) );

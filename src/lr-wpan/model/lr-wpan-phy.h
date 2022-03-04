@@ -298,6 +298,13 @@ public:
   virtual Ptr<const SpectrumModel> GetRxSpectrumModel (void) const;
 
   /**
+   * Set the receive sensitivity.
+   *
+   * \param rxSensitivityDbm the receive sensitivity in dBm.
+   */
+  void SetRxSensitivity(double rxSensitivityDbm);
+
+  /**
    * Set the Power Spectral Density of outgoing signals in W/Hz.
    *
    * @param txPsd the Power Spectral Density value

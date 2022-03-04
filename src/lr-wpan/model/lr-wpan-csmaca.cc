@@ -206,7 +206,7 @@ LrWpanCsmaCa::Start ()
 	  fprintf(stderr, "IsNotSlottedCsmaCa()\n");
 	  if(!this->GetMac()->m_macHeaderAdd)
 	  {
-		  fprintf(stderr, "Immediately do a CCA\n");
+		  fprintf(stderr, "Immediately do a CCA, sim time: %ld\n", Simulator::Now().GetTimeStep());
 		  //Let OpenThread do CSMA/CA, so skip RandomBackoffDelay call, and instead directly request a CCA.
 		  m_requestCcaEvent = Simulator::ScheduleNow (&LrWpanCsmaCa::RequestCCA, this);
 	  }
@@ -298,7 +298,7 @@ LrWpanCsmaCa::CanProceed ()
 void
 LrWpanCsmaCa::RequestCCA ()
 {
-	fprintf(stderr, "In RequestCCA()\n");
+	fprintf(stderr, "In RequestCCA(), sim time: %ld\n", Simulator::Now().GetTimeStep());
   NS_LOG_FUNCTION (this);
   m_ccaRequestRunning = true;
   m_mac->GetPhy ()->PlmeCcaRequest ();

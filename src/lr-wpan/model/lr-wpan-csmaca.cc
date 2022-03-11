@@ -146,6 +146,7 @@ LrWpanCsmaCa::SetMacMaxCSMABackoffs (uint8_t macMaxCSMABackoffs)
 {
   NS_LOG_FUNCTION (this << macMaxCSMABackoffs);
   m_macMaxCSMABackoffs = macMaxCSMABackoffs;
+  fprintf(stderr, "m_macMaxCSMABackoffs = %d\n", macMaxCSMABackoffs);
 }
 
 uint8_t

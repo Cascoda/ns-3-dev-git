@@ -339,6 +339,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
   // Prevent PHY from receiving another packet while switching the transceiver state.
   if (m_trxState == IEEE_802_15_4_PHY_RX_ON && !m_setTRXState.IsRunning ())
     {
+	  fprintf(stderr, "m_trxState == PHY_RX_ON && !m_setTRXState.IsRunning()\n");
       // The specification doesn't seem to refer to BUSY_RX, but vendor
       // data sheets suggest that this is a substate of the RX_ON state
       // that is entered after preamble detection when the digital receiver
@@ -361,12 +362,14 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
       *interferenceAndNoise -= *lrWpanRxParams->psd;
       *interferenceAndNoise += *m_noise;
       double sinr = LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd, m_phyPIBAttributes.phyCurrentChannel) / LrWpanSpectrumValueHelper::TotalAvgPower (interferenceAndNoise, m_phyPIBAttributes.phyCurrentChannel);
+      fprintf(stderr, "sinr: %e\n", sinr);
 
       // Std. 802.15.4-2006, appendix E, Figure E.2
       // At SNR < -5 the BER is less than 10e-1.
       // It's useless to even *try* to decode the packet.
       if (10 * log10 (sinr) > -5)
         {
+    	  fprintf(stderr, "snr > -5\n");
           ChangeTrxState (IEEE_802_15_4_PHY_BUSY_RX);
           m_currentRxPacket = std::make_pair (lrWpanRxParams, false);
           m_phyRxBeginTrace (p);
@@ -375,13 +378,16 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
         }
       else
         {
+    	  fprintf(stderr, "snr <= -5, dropped\n");
           m_phyRxDropTrace (p);
         }
     }
   else if (m_trxState == IEEE_802_15_4_PHY_BUSY_RX)
     {
+	  fprintf(stderr, "m_trxState == PHY_BUSY_RX\n");
       // Drop the new packet.
       NS_LOG_DEBUG (this << " packet collision");
+      fprintf(stderr, "packet collision, drop the new packet\n");
       m_phyRxDropTrace (p);
 
       // Check if we correctly received the old packet up to now.
@@ -671,7 +677,6 @@ LrWpanPhy::PdDataRequest (const uint32_t psduLength, Ptr<Packet> p)
 
           txParams->packetBurst = pb;
           m_channel->StartTx (txParams);
-          fprintf(stderr, "StartTx called\n");
           m_pdDataRequest = Simulator::Schedule (txParams->duration, &LrWpanPhy::EndTx, this);
 
           fprintf(stderr, "LrWpanPhy::EndTx scheduled for %ld us in the future (current sim: %ld)\n",
@@ -1175,7 +1180,18 @@ LrWpanPhy::ChangeTrxState (LrWpanPhyEnumeration newState)
 bool
 LrWpanPhy::PhyIsBusy (void) const
 {
+	fprintf(stderr, "In PhyIsBusy()");
+
   NS_LOG_FUNCTION (this << m_trxState);
+  if(m_trxState == IEEE_802_15_4_PHY_BUSY_TX)
+	  fprintf(stderr, "m_trxState == IEEE_802_15_4_PHY_BUSY_TX\n");
+  else if(m_trxState == IEEE_802_15_4_PHY_BUSY_RX)
+	  fprintf(stderr, "m_trxState == IEEE_802_15_4_PHY_BUSY_RX\n");
+  else if(m_trxState == IEEE_802_15_4_PHY_BUSY)
+	  fprintf(stderr, "m_trxState == IEEE_802_15_4_PHY_BUSY\n");
+  else
+	  fprintf(stderr, "m_trxState not busy in any way\n");
+
   return ((m_trxState == IEEE_802_15_4_PHY_BUSY_TX)
           || (m_trxState == IEEE_802_15_4_PHY_BUSY_RX)
           || (m_trxState == IEEE_802_15_4_PHY_BUSY));
@@ -1239,7 +1255,7 @@ LrWpanPhy::EndCca (void)
 
   // Update peak power.
   double power = LrWpanSpectrumValueHelper::TotalAvgPower (m_signal->GetSignalPsd (), m_phyPIBAttributes.phyCurrentChannel);
-  fprintf(stderr, "power: %lf, m_ccaPeakPower: %lf\n", power, m_ccaPeakPower);
+  fprintf(stderr, "power: %e, m_ccaPeakPower: %e\n", power, m_ccaPeakPower);
   if (m_ccaPeakPower < power)
     {
       m_ccaPeakPower = power;

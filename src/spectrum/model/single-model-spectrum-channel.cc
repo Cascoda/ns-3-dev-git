@@ -113,6 +113,7 @@ SingleModelSpectrumChannel::AddRx (Ptr<SpectrumPhy> phy)
 void
 SingleModelSpectrumChannel::StartTx (Ptr<SpectrumSignalParameters> txParams)
 {
+	fprintf(stderr, "In SingleModelSpectrumChannel::StartTx()\n");
   NS_LOG_FUNCTION (this << txParams->psd << txParams->duration << txParams->txPhy);
   NS_ASSERT_MSG (txParams->psd, "NULL txPsd");
   NS_ASSERT_MSG (txParams->txPhy, "NULL txPhy");
@@ -133,6 +134,7 @@ SingleModelSpectrumChannel::StartTx (Ptr<SpectrumSignalParameters> txParams)
 
 
   Ptr<MobilityModel> senderMobility = txParams->txPhy->GetMobility ();
+  fprintf(stderr, "senderMobility, x:%f y:%f z:%f\n", senderMobility->GetPosition().x, senderMobility->GetPosition().y, senderMobility->GetPosition().z);
 
   for (PhyList::const_iterator rxPhyIterator = m_phyList.begin ();
        rxPhyIterator != m_phyList.end ();
@@ -143,6 +145,8 @@ SingleModelSpectrumChannel::StartTx (Ptr<SpectrumSignalParameters> txParams)
           Time delay  = MicroSeconds (0);
 
           Ptr<MobilityModel> receiverMobility = (*rxPhyIterator)->GetMobility ();
+          fprintf(stderr, "receiverMobility, x:%f y:%f z:%f\n", receiverMobility->GetPosition().x, receiverMobility->GetPosition().y, receiverMobility->GetPosition().z);
+
           NS_LOG_LOGIC ("copying signal parameters " << txParams);
           Ptr<SpectrumSignalParameters> rxParams = txParams->Copy ();
 
@@ -175,6 +179,7 @@ SingleModelSpectrumChannel::StartTx (Ptr<SpectrumSignalParameters> txParams)
               m_pathLossTrace (txParams->txPhy, *rxPhyIterator, pathLossDb);
               if ( pathLossDb > m_maxLossDb)
                 {
+            	  fprintf(stderr, "beyond range...\n");
                   // beyond range
                   continue;
                 }
@@ -198,10 +203,12 @@ SingleModelSpectrumChannel::StartTx (Ptr<SpectrumSignalParameters> txParams)
             {
               // the receiver has a NetDevice, so we expect that it is attached to a Node
               uint32_t dstNode =  netDev->GetNode ()->GetId ();
+              fprintf(stderr, "Scheduling StartRx for node %d\n", netDev->GetNode()->GetId());
               Simulator::ScheduleWithContext (dstNode, delay, &SingleModelSpectrumChannel::StartRx, this, rxParams, *rxPhyIterator);
             }
           else
             {
+        	  fprintf(stderr, "receiver not attached to a NetDevice\n");
               // the receiver is not attached to a NetDevice, so we cannot assume that it is attached to a node
               Simulator::Schedule (delay, &SingleModelSpectrumChannel::StartRx, this,
                                    rxParams, *rxPhyIterator);

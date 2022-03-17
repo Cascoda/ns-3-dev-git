@@ -47,6 +47,7 @@ NS_OBJECT_ENSURE_REGISTERED (LrWpanPhy);
 // Table 22 in section 6.4.1 of ieee802.15.4
 const uint32_t LrWpanPhy::aMaxPhyPacketSize = 127; // max PSDU in octets
 const uint32_t LrWpanPhy::aTurnaroundTime = 12;  // RX-to-TX or TX-to-RX in symbol periods
+const double LrWpanPhy::aIdealRxSens = -113.2;  // Ideal Receive sensitivity in dbm (see paper: Theoretical and Practical Limits to Sensitivity in IEEE 802.15.5 Receivers)
 
 // IEEE802.15.4-2006 Table 2 in section 6.1.2 (kb/s and ksymbol/s)
 // The index follows LrWpanPhyOption
@@ -286,6 +287,9 @@ void
 LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 {
 	fprintf(stderr, "In LrWpanPhy::StartRx()\n");
+  Ptr<MobilityModel> nodeMobility = this->GetMobility();
+  fprintf(stderr, "nodeMobility, x:%f y:%f z:%f\n", nodeMobility->GetPosition().x, nodeMobility->GetPosition().y, nodeMobility->GetPosition().z);
+
   NS_LOG_FUNCTION (this << spectrumRxParams);
   LrWpanSpectrumValueHelper psdHelper;
 
@@ -367,9 +371,14 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
       // Std. 802.15.4-2006, appendix E, Figure E.2
       // At SNR < -5 the BER is less than 10e-1.
       // It's useless to even *try* to decode the packet.
-      if (10 * log10 (sinr) > -5)
+      double rx_sens_dbm_val = 10.0 * log10(1000.0 * m_rxSensitivity);
+      double snr_min = -5 + (rx_sens_dbm_val - aIdealRxSens); //Based on Equation (7) of Theoretical and Practical Limits to Sensitivity in IEEE 802.15.4 Receivers paper.
+
+	  fprintf(stderr, "rx_sens_dbm_val: %e, aIdealRxSens: %e, sinr_min: %e\n", rx_sens_dbm_val, aIdealRxSens, snr_min);
+
+      if (10 * log10 (sinr) > snr_min)
         {
-    	  fprintf(stderr, "snr > -5\n");
+    	  fprintf(stderr, "snr > snr_min\n");
           ChangeTrxState (IEEE_802_15_4_PHY_BUSY_RX);
           m_currentRxPacket = std::make_pair (lrWpanRxParams, false);
           m_phyRxBeginTrace (p);
@@ -378,7 +387,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
         }
       else
         {
-    	  fprintf(stderr, "snr <= -5, dropped\n");
+    	  fprintf(stderr, "snr <= snr_min, dropped\n");
           m_phyRxDropTrace (p);
         }
     }
@@ -389,6 +398,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
       NS_LOG_DEBUG (this << " packet collision");
       fprintf(stderr, "packet collision, drop the new packet\n");
       m_phyRxDropTrace (p);
+      m_currentRxPacket.second = true; //INTERFERENCE, PACKET SHOULD BE DESTROYED
 
       // Check if we correctly received the old packet up to now.
       CheckInterference ();
@@ -429,6 +439,8 @@ fprintf(stderr, "LrWpanPhy::EndRx() scheduled for %ld us in the future (cur sim 
 void
 LrWpanPhy::CheckInterference (void)
 {
+	static uint64_t num_of_destroyed = 0;
+
 	fprintf(stderr, "In CheckInterference()\n");
   // Calculate whether packet was lost.
   LrWpanSpectrumValueHelper psdHelper;
@@ -460,11 +472,14 @@ LrWpanPhy::CheckInterference (void)
     	  fprintf(stderr, "\tThere is an error model.\n");
           // How many bits did we receive since the last calculation?
           double t = (Simulator::Now () - m_rxLastUpdate).ToDouble (Time::MS);
+          fprintf(stderr, "t: %e\n", t);
           uint32_t chunkSize = ceil (t * (GetDataOrSymbolRate (true) / 1000));
+          fprintf(stderr, "chunkSize: %d\n", chunkSize);
           Ptr<SpectrumValue> interferenceAndNoise = m_signal->GetSignalPsd ();
           *interferenceAndNoise -= *currentRxParams->psd;
           *interferenceAndNoise += *m_noise;
           double sinr = LrWpanSpectrumValueHelper::TotalAvgPower (currentRxParams->psd, m_phyPIBAttributes.phyCurrentChannel) / LrWpanSpectrumValueHelper::TotalAvgPower (interferenceAndNoise, m_phyPIBAttributes.phyCurrentChannel);
+          fprintf(stderr, "sinr: %e\n", sinr);
           double per = 1.0 - m_errorModel->GetChunkSuccessRate (sinr, chunkSize);
 
           // The LQI is the total packet success rate scaled to 0-255.
@@ -491,6 +506,7 @@ LrWpanPhy::CheckInterference (void)
           if (m_random->GetValue () < per)
             {
         	  fprintf(stderr, "Packet was destroyed, drop the packet after reception.\n");
+        	  fprintf(stderr, "num_of_destroyed: %ld\n", ++num_of_destroyed);
               // The packet was destroyed, drop the packet after reception.
               m_currentRxPacket.second = true;
             }
@@ -507,6 +523,8 @@ void
 LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> par)
 {
 	fprintf(stderr, "In LrWpanPhy::EndRx()\n");
+  Ptr<MobilityModel> nodeMobility = this->GetMobility();
+  fprintf(stderr, "nodeMobility, x:%f y:%f z:%f\n", nodeMobility->GetPosition().x, nodeMobility->GetPosition().y, nodeMobility->GetPosition().z);
   NS_LOG_FUNCTION (this);
 
   Ptr<LrWpanSpectrumSignalParameters> params = DynamicCast<LrWpanSpectrumSignalParameters> (par);
@@ -1270,7 +1288,7 @@ LrWpanPhy::EndCca (void)
     { //sec 6.9.9 ED detection
       // -- ED threshold at most 10 dB above receiver sensitivity.
 	  fprintf(stderr, "Doing CCA, m_ccaPeakPower: %e, m_rxSensitivity: %e\n", m_ccaPeakPower, m_rxSensitivity);
-      if (10 * log10 (m_ccaPeakPower / m_rxSensitivity) >= 10.0)
+      if (10 * log10 (m_ccaPeakPower / m_rxSensitivity) >= 0)
         {
     	  fprintf(stderr, "set sensedChannelState to BUSY\n");
           sensedChannelState = IEEE_802_15_4_PHY_BUSY;
@@ -1346,6 +1364,8 @@ void
 LrWpanPhy::EndTx (void)
 {
 	fprintf(stderr, "In LrWpanPhy::EndTx()\n");
+  Ptr<MobilityModel> nodeMobility = this->GetMobility();
+  fprintf(stderr, "nodeMobility, x:%f y:%f z:%f\n", nodeMobility->GetPosition().x, nodeMobility->GetPosition().y, nodeMobility->GetPosition().z);
 
   NS_LOG_FUNCTION (this);
 

@@ -269,6 +269,12 @@ public:
   static const uint32_t aTurnaroundTime;
 
   /**
+   * Ideal Receive sensitivity in dbm
+   * See paper: Theoretical and Practical Limits to Sensitivity in IEEE 802.15.5 Receivers)
+   */
+  static const double aIdealRxSens;
+
+  /**
    * Default constructor.
    */
   LrWpanPhy (void);
